@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/student_model.dart';
-import '../map/map_screen.dart';
 
 class StudentDetailScreen extends StatelessWidget {
   final StudentModel student;
@@ -12,7 +11,6 @@ class StudentDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(student.name)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
         children: [
           ListTile(
             title: const Text('Name'),
@@ -49,22 +47,6 @@ class StudentDetailScreen extends StatelessWidget {
             subtitle: Text(student.address ?? '-'),
           ),
           const Divider(height: 1),
-          if (student.address != null && student.address!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MapScreen(
-                      address: student.address!,
-                      name: student.name,
-                    ),
-                  ),
-                ),
-                child: const Text('View on Map'),
-              ),
-            ),
         ],
       ),
     );

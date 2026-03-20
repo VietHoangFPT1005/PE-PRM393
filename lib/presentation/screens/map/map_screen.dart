@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/student_provider.dart';
 
 class MapScreen extends StatefulWidget {
-  final String? address; // optional - nếu truyền vào thì tự search luôn
-  final String? name;
-
-  const MapScreen({super.key, this.address, this.name});
+  const MapScreen({super.key});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -27,13 +27,34 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    // Nếu được truyền địa chỉ từ StudentDetail thì tự search
-    if (widget.address != null && widget.address!.isNotEmpty) {
-      _searchCtrl.text = widget.address!;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _searchAddress(widget.address!, label: widget.name);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Load students trước
+      await context.read<StudentProvider>().fetchAll();
+
+      if (!mounted) return;
+
+      // Lấy email của user đang đăng nhập
+      final authProvider = context.read<AuthProvider>();
+      final currentEmail = authProvider.currentUser?.email;
+
+      if (currentEmail == null) return; // Chưa đăng nhập → bỏ qua
+
+      // Tìm student có email trùng với tài khoản đăng nhập
+      final students = context.read<StudentProvider>().students;
+      final matchedStudent = students.where(
+        (s) => s.email?.toLowerCase() == currentEmail.toLowerCase(),
+      ).firstOrNull;
+
+      if (matchedStudent == null) return; // Không tìm thấy student
+
+      if (matchedStudent.address == null || matchedStudent.address!.isEmpty) {
+        return; // Student không có địa chỉ
+      }
+
+      // Có địa chỉ → điền vào ô search và tự search
+      _searchCtrl.text = matchedStudent.address!;
+      _searchAddress(matchedStudent.address!, label: matchedStudent.name);
+    });
   }
 
   @override
@@ -75,15 +96,10 @@ class _MapScreenState extends State<MapScreen> {
           _mapController.move(location, 14);
         } else {
           setState(() {
-            _errorMsg = 'Address not found. Try a more specific address.';
+            _errorMsg = 'Address not found.';
             _isSearching = false;
           });
         }
-      } else {
-        setState(() {
-          _errorMsg = 'Search failed. Check internet connection.';
-          _isSearching = false;
-        });
       }
     } catch (e) {
       setState(() {
@@ -95,11 +111,13 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = context.watch<AuthProvider>().isLoggedIn;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Map')),
+      appBar: AppBar(title: const Text('Student Map')),
       body: Stack(
         children: [
-          // Map layer
+          // Map
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -116,30 +134,20 @@ class _MapScreenState extends State<MapScreen> {
                   markers: [
                     Marker(
                       point: _markerLocation!,
-                      width: 160,
-                      height: 70,
+                      width: 140,
+                      height: 60,
                       child: Column(
                         children: [
                           const Icon(Icons.location_pin,
-                              color: Colors.red, size: 36),
+                              color: Colors.red, size: 32),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(4),
-                              boxShadow: const [
-                                BoxShadow(
-                                    color: Colors.black26, blurRadius: 4)
-                              ],
-                            ),
+                                horizontal: 4, vertical: 2),
+                            color: Colors.white,
                             child: Text(
                               _markerLabel ?? '',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontSize: 11),
                               overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
                             ),
                           ),
                         ],
@@ -150,25 +158,24 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
 
-          // Search bar nổi trên map
+          // Search bar
           Positioned(
-            top: 12,
-            left: 12,
-            right: 12,
+            top: 12, left: 12, right: 12,
             child: Material(
               elevation: 4,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               child: TextField(
                 controller: _searchCtrl,
                 decoration: InputDecoration(
-                  hintText: 'Search address...',
+                  hintText: isLoggedIn
+                      ? 'Your address...'
+                      : 'Sign in to see your location',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _isSearching
                       ? const Padding(
                           padding: EdgeInsets.all(12),
                           child: SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 20, height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         )
@@ -183,7 +190,7 @@ class _MapScreenState extends State<MapScreen> {
                           },
                         ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
@@ -200,23 +207,29 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
+          // Thông báo chưa đăng nhập
+          if (!isLoggedIn)
+            Positioned(
+              bottom: 16, left: 16, right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                color: Colors.black54,
+                child: const Text(
+                  'Sign in with Google to see your location on the map',
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
           // Error message
           if (_errorMsg != null)
             Positioned(
-              top: 80,
-              left: 12,
-              right: 12,
-              child: Material(
+              top: 72, left: 12, right: 12,
+              child: Container(
+                padding: const EdgeInsets.all(8),
                 color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(
-                    _errorMsg!,
-                    style: TextStyle(color: Colors.red.shade800),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+                child: Text(_errorMsg!, textAlign: TextAlign.center),
               ),
             ),
         ],
