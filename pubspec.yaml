@@ -1,0 +1,36 @@
+name: pe_prm393
+description: "Student Management Application - PRM392 PE"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Supabase
+  supabase_flutter: ^2.5.0
+
+  # Google Sign In
+  google_sign_in: ^6.1.6
+
+  # Map (OpenStreetMap - free, no API key needed)
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+
+  # HTTP (for Nominatim geocoding)
+  http: ^1.2.0
+
+  # State management
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
